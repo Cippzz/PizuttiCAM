@@ -1,17 +1,15 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// Este é um projeto de código aberto não comercial.
 /********************************************************************************
- * Author    :  Damir Bakiev                                                    *
- * Version   :  na                                                              *
- * Date      :  XXXXX XX, 2025                                                  *
- * Website   :  na                                                              *
- * Copyright :  Damir Bakiev 2016-2026                                          *
- * License   :                                                                  *
- * Use, modification & distribution is subject to Boost Software License Ver 1. *
+ * Autor    : Damir Bakiev                                                      *
+ * Versão   : na                                                                *
+ * Data     : XXXXX XX, 2026                                                    *
+ * Website  : na                                                                *
+ * Copyright: Damir Bakiev 2016-2026                                            *
+ * Licença  :                                                                   *
+ * Uso, modificação e distribuição estão sujeitos à Boost Software License Ver 1*
  * http://www.boost.org/LICENSE_1_0.txt                                         *
  ********************************************************************************/
-// #include "a_pch.h "
+// #include "a_pch.h"
 #include "settingsdialog.h"
 #include "abstract_fileplugin.h"
 #include "colorselector.h"
@@ -27,17 +25,17 @@
 const int gridColor = 100;
 
 const QColor defaultColor[GuiColors::Count]{
-    QColor(),                                     // Background
-    QColor(255, 255, 0, 120),                     // Pin
-    QColor(Qt::gray),                             // CutArea
-    QColor(gridColor, gridColor, gridColor, 50),  // Grid1
-    QColor(gridColor, gridColor, gridColor, 100), // Grid5
-    QColor(gridColor, gridColor, gridColor, 200), // Grid10
-    QColor(),                                     // Hole
-    QColor(0, 255, 0, 120),                       // Home
-    QColor(Qt::black),                            // ToolPath
-    QColor(255, 0, 0, 120),                       // Zero
-    QColor(Qt::red)                               // G0
+    QColor(),                                     // Fundo (Background)
+    QColor(255, 255, 0, 120),                     // Pino (Pin)
+    QColor(Qt::gray),                             // Área de Corte (CutArea)
+    QColor(gridColor, gridColor, gridColor, 50),  // Grade 0.1
+    QColor(gridColor, gridColor, gridColor, 100), // Grade 0.5
+    QColor(gridColor, gridColor, gridColor, 200), // Grade 1.0
+    QColor(),                                     // Furo (Hole)
+    QColor(0, 255, 0, 120),                       // Posição Inicial (Home)
+    QColor(Qt::black),                            // Caminho da Ferramenta (ToolPath)
+    QColor(255, 0, 0, 120),                       // Ponto Zero
+    QColor(Qt::red)                               // Movimento Rápido (G0)
 };
 
 const QString colorName[GuiColors::Count]{
@@ -63,7 +61,7 @@ public:
 
     virtual ~ModelSettings() { }
 
-    // QAbstractItemModel interface
+    // Interface QAbstractItemModel
     int rowCount(const QModelIndex& /*parent*/) const override { return data_.size(); }
     int columnCount(const QModelIndex& /*parent*/) const override { return 1; }
     QVariant data(const QModelIndex& index, int role) const override {
@@ -83,8 +81,10 @@ SettingsDialog::SettingsDialog(QWidget* parent, int tab)
     : QDialog{parent} {
     ui.setupUi(this);
 
-    // Порядок важен: available() короткозамыкает проверку, чтобы на машине с
-    // битым драйвером не дёргать GL из-за одной галочки в настройках.
+    // Habilita rolagem na barra de abas para evitar sobreposição dos nomes
+    ui.tabwMain->setUsesScrollButtons(true);
+
+    // A ordem é importante: available() evita checar GL em máquinas com driver corrompido
     ui.chbxOpenGl->setEnabled(OpenGlCheck::available() && QOpenGLContext::supportsThreadedOpenGL());
     if(const auto hint = OpenGlCheck::howToEnable(); !hint.isEmpty())
         ui.chbxOpenGl->setToolTip(hint);
@@ -103,7 +103,7 @@ SettingsDialog::SettingsDialog(QWidget* parent, int tab)
         qApp->setFont(f);
     });
 
-    // Language
+    // Idiomas
     ui.cbxLanguage->addItem(u"English"_s, u"en"_s);
     ui.cbxLanguage->addItem(u"Русский"_s, u"ru"_s);
     ui.cbxLanguage->addItem(u"中文"_s, u"zh"_s);
@@ -130,9 +130,8 @@ SettingsDialog::SettingsDialog(QWidget* parent, int tab)
 
     ui.labelAPIcon->setPixmap(QIcon::fromTheme(u"snap-nodes-cusp"_s).pixmap(ui.labelAPIcon->size()));
 
-    tabs.reserve(App::filePlugins().size() + 1); // NOTE +1 for GCode
+    tabs.reserve(App::filePlugins().size() + 1); // NOTA: +1 para GCode
 
-    // auto model = new ModelSettings{listView};
     {
         auto tab = new GCode::Tab{this};
         tabs.emplace_back(tab);
@@ -144,25 +143,17 @@ SettingsDialog::SettingsDialog(QWidget* parent, int tab)
         auto tab = ptr->createSettingsTab(this);
         if(!tab) continue;
 
-        // model->addWidget(tab);
-        // auto gbx = new QGroupBox{tab->windowTitle(), this};
-        // auto lay = new QHBoxLayout{gbx};
-        // lay->addWidget(tab);
-        // verticalLayout_3->addWidget(gbx);
-
         tabs.emplace_back(tab);
         ui.tabwMain->addTab(tab, tab->windowTitle());
         tab->readSettings(settings);
     }
-
-    // listView->setModel(model);
 
     readSettings();
     readSettingsDialog();
     if(tab > -1)
         ui.tabwMain->setCurrentIndex(tab);
 
-    { // Open Settings Folder
+    { // Botão para abrir pasta de configurações
         button = new QPushButton{tr("Open Settings Folder"), ui.buttonBox};
         button->setIcon(QIcon::fromTheme(u"folder"_s));
         button->setMinimumWidth(QFontMetrics(font()).boundingRect(button->text()).width() + 32);
@@ -177,8 +168,7 @@ SettingsDialog::SettingsDialog(QWidget* parent, int tab)
 SettingsDialog::~SettingsDialog() { saveSettingsDialog(); }
 
 void SettingsDialog::readSettings() {
-    /*GUI*/
-
+    /* GUI */
     settings.beginGroup(u"Viewer"_s);
     settings.getValue(ui.chbxAntialiasing);
     settings.getValue(ui.chbxOpenGl);
@@ -196,16 +186,15 @@ void SettingsDialog::readSettings() {
         = QColor{settings.value(u"AccentColor"_s, App::settings().accentColor_.name(QColor::HexArgb)).toString()};
     settings.endGroup();
 
-    // Маркеры уже созданы (конструктор MainWindow), а настройку прочитали
-    // только сейчас -- применяем её к ним.
+    // Aplica o modo de escala dos marcadores
     Gi::applyMarkersScaleMode();
 
     settings.beginGroup(u"Color"_s);
     for(int i{}; i < GuiColors::Count; ++i)
         App::settings().guiColor_[i]
             = settings.value(
-                          EnumHelper::toString(static_cast<GuiColors::Name>(i)),
-                          App::settings().guiColor_[i].name(QColor::HexArgb))
+                      EnumHelper::toString(static_cast<GuiColors::Name>(i)),
+                      App::settings().guiColor_[i].name(QColor::HexArgb))
                   .toString();
 
     settings.endGroup();
@@ -216,7 +205,7 @@ void SettingsDialog::readSettings() {
     ui.cbxFontSize->setCurrentText(fontSize);
     settings.endGroup();
 
-    /*cl::Clipper64*/
+    /* cl::Clipper64 */
     settings.beginGroup(u"cl::Clipper64"_s);
     App::settings().clpMinCircleSegmentLength_
         = settings.getValue(ui.dsbxMinCircleSegmentLength, App::settings().clpMinCircleSegmentLength_);
@@ -224,7 +213,7 @@ void SettingsDialog::readSettings() {
         = settings.getValue(ui.sbxMinCircleSegments, App::settings().clpMinCircleSegments_);
     settings.endGroup();
 
-    /*Markers*/
+    /* Marcadores */
     settings.beginGroup(u"Home"_s);
     settings.getValue(u"homeOffset"_s, App::settings().mrkHomeOffset_);
     settings.getValue(u"pinOffset"_s, App::settings().mrkPinOffset_, QPointF(6, 6));
@@ -238,7 +227,8 @@ void SettingsDialog::readSettings() {
     settings.getValue(ui.cbxHomePos, HomePosition::TopLeft);
     settings.getValue(ui.cbxZeroPos, HomePosition::TopLeft);
     settings.endGroup();
-    /*Other*/
+
+    /* Outros */
     settings.getValue("inch", App::settings().banana_, false);
     settings.getValue("snap", App::settings().snap_, false);
     for(auto tab: tabs)
@@ -246,7 +236,7 @@ void SettingsDialog::readSettings() {
 }
 
 void SettingsDialog::saveSettings() {
-    /*GUI*/
+    /* GUI */
     settings.beginGroup(u"Viewer"_s);
     if(settings.value(u"chbxOpenGl"_s).toBool() != ui.chbxOpenGl->isChecked()) {
         App::grView().setOpenGL(ui.chbxOpenGl->isChecked());
@@ -257,7 +247,6 @@ void SettingsDialog::saveSettings() {
     if(settings.value(u"chbxAntialiasing"_s).toBool() != ui.chbxAntialiasing->isChecked()) {
         const bool aa = ui.chbxAntialiasing->isChecked();
         App::grView().setRenderHint(QPainter::Antialiasing, aa);
-        // Запас в 2 device-px под сглаживание нужен только при включённом AA.
         App::grView().setOptimizationFlag(QGraphicsView::DontAdjustForAntialiasing, !aa);
         settings.setValue(ui.chbxAntialiasing);
     }
@@ -265,8 +254,6 @@ void SettingsDialog::saveSettings() {
     App::settings().guiSmoothScSh_ = settings.setValue(ui.chbxSmoothScSh);
     App::settings().scaleHZMarkers_ = settings.setValue(ui.chbxScaleHZMarkers);
     App::settings().scalePinMarkers_ = settings.setValue(ui.chbxScalePinMarkers);
-    // Маркеры держат экранный размер флагом ItemIgnoresTransformations, а не
-    // масштабированием в paint(), поэтому смену настройки надо применить.
     Gi::applyMarkersScaleMode();
     App::settings().theme_ = settings.setValue(ui.cbxTheme);
     settings.setValue(u"AccentColor"_s, App::settings().accentColor_.name(QColor::HexArgb));
@@ -281,13 +268,13 @@ void SettingsDialog::saveSettings() {
     settings.setValue(u"FontSize"_s, ui.cbxFontSize->currentText());
     settings.endGroup();
 
-    /*cl::Clipper64*/
+    /* cl::Clipper64 */
     settings.beginGroup(u"cl::Clipper64"_s);
     App::settings().clpMinCircleSegmentLength_ = settings.setValue(ui.dsbxMinCircleSegmentLength);
     App::settings().clpMinCircleSegments_ = settings.setValue(ui.sbxMinCircleSegments);
     settings.endGroup();
 
-    /*Markers*/
+    /* Marcadores */
     settings.beginGroup(u"Home"_s);
     App::settings().mrkHomeOffset_ = settings.setValue(u"homeOffset"_s, QPointF(ui.dsbxHomeX->value(), ui.dsbxHomeY->value()));
     App::settings().mrkHomePos_ = settings.setValue(ui.cbxHomePos);
@@ -296,7 +283,7 @@ void SettingsDialog::saveSettings() {
     App::settings().mrkZeroPos_ = settings.setValue(ui.cbxZeroPos);
     settings.endGroup();
 
-    /*Other*/
+    /* Outros */
     settings.setValue("inch", App::settings().banana_);
     settings.setValue("snap", App::settings().snap_);
     for(auto tab: tabs)
@@ -351,11 +338,12 @@ void SettingsDialog::accept() {
 }
 
 void SettingsDialog::showEvent(QShowEvent* event) {
-    int width{};
-    for(int i{}; i < ui.tabwMain->tabBar()->count(); ++i)
-        width += ui.tabwMain->tabBar()->tabRect(i).width();
-    resize(width + 20, 10);
-    button->setMaximumHeight(ui.buttonBox->button(QDialogButtonBox::Ok)->height());
+    // Define um tamanho fixo/mínimo razoável sem forçar o encolhimento vertical
+    setMinimumSize(620, 500);
+    resize(680, 600);
+    
+    if (button && ui.buttonBox->button(QDialogButtonBox::Ok))
+        button->setMaximumHeight(ui.buttonBox->button(QDialogButtonBox::Ok)->height());
 
     QDialog::showEvent(event);
 }
@@ -369,10 +357,15 @@ bool SettingsDialog::eventFilter(QObject* watched, QEvent* event) {
 void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     if(SettingsDialog->objectName().isEmpty())
         SettingsDialog->setObjectName(u"SettingsDialog"_s);
-    SettingsDialog->resize(392, 517);
+    
+    // Configura janela expansível e com tamanho inicial adequado
+    SettingsDialog->resize(680, 720);
+    SettingsDialog->setMinimumSize(620, 650);
+
     gridLayout_2 = new QGridLayout{SettingsDialog};
     gridLayout_2->setObjectName(u"gridLayout_2"_s);
     gridLayout_2->setContentsMargins(6, 6, 6, 6);
+
     buttonBox = new QDialogButtonBox{SettingsDialog};
     buttonBox->setObjectName(u"buttonBox"_s);
     buttonBox->setOrientation(Qt::Horizontal);
@@ -382,12 +375,26 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
 
     tabwMain = new QTabWidget{SettingsDialog};
     tabwMain->setObjectName(u"tabwMain"_s);
+    tabwMain->setUsesScrollButtons(true);
+
+    // --- ABA UI (com ScrollArea para permitir rolagem vertical) ---
     tabGui = new QWidget();
     tabGui->setObjectName(u"tabGui"_s);
-    verticalLayout_8 = new QVBoxLayout{tabGui};
+    
+    QVBoxLayout* tabGuiLayout = new QVBoxLayout{tabGui};
+    tabGuiLayout->setContentsMargins(0, 0, 0, 0);
+
+    QScrollArea* scrollGui = new QScrollArea{tabGui};
+    scrollGui->setWidgetResizable(true);
+    scrollGui->setFrameShape(QFrame::NoFrame);
+    scrollGui->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+    QWidget* scrollGuiContent = new QWidget();
+    verticalLayout_8 = new QVBoxLayout{scrollGuiContent};
     verticalLayout_8->setObjectName(u"verticalLayout_8"_s);
     verticalLayout_8->setContentsMargins(6, 6, 6, 6);
-    groupBox = new QGroupBox{tabGui};
+
+    groupBox = new QGroupBox{scrollGuiContent};
     groupBox->setObjectName(u"groupBox"_s);
     gridLayout = new QGridLayout{groupBox};
     gridLayout->setObjectName(u"gridLayout"_s);
@@ -445,29 +452,26 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
 
     verticalLayout_8->addWidget(groupBox);
 
-    gbViewer = new QGroupBox{tabGui};
+    gbViewer = new QGroupBox{scrollGuiContent};
     gbViewer->setObjectName(u"gbViewer"_s);
     verticalLayout_2 = new QVBoxLayout{gbViewer};
     verticalLayout_2->setObjectName(u"verticalLayout_2"_s);
     verticalLayout_2->setContentsMargins(6, 9, 6, 6);
+
     chbxOpenGl = new QCheckBox{gbViewer};
     chbxOpenGl->setObjectName(u"chbxOpenGl"_s);
-
     verticalLayout_2->addWidget(chbxOpenGl);
 
     chbxAntialiasing = new QCheckBox{gbViewer};
     chbxAntialiasing->setObjectName(u"chbxAntialiasing"_s);
-
     verticalLayout_2->addWidget(chbxAntialiasing);
 
     chbxSmoothScSh = new QCheckBox{gbViewer};
     chbxSmoothScSh->setObjectName(u"chbxSmoothScSh"_s);
-
     verticalLayout_2->addWidget(chbxSmoothScSh);
 
     chbxAnimSelection = new QCheckBox{gbViewer};
     chbxAnimSelection->setObjectName(u"chbxAnimSelection"_s);
-
     verticalLayout_2->addWidget(chbxAnimSelection);
 
     gbxColor = new QGroupBox{gbViewer};
@@ -483,41 +487,52 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     formLayout->setContentsMargins(6, 9, 6, 6);
 
     verticalLayout_2->addWidget(gbxColor);
-
     verticalLayout_8->addWidget(gbViewer);
 
+    // VINCULA O CONTEÚDO AO SCROLL AREA E O SCROLL AREA À ABA
+    scrollGui->setWidget(scrollGuiContent);
+    tabGuiLayout->addWidget(scrollGui);
     tabwMain->addTab(tabGui, QString());
+
+    // --- ABA UTILS (com ScrollArea para segurança) ---
     tabUtils = new QWidget();
     tabUtils->setObjectName(u"tabUtils"_s);
-    verticalLayout = new QVBoxLayout{tabUtils};
+
+    QVBoxLayout* tabUtilsLayout = new QVBoxLayout{tabUtils};
+    tabUtilsLayout->setContentsMargins(0, 0, 0, 0);
+
+    QScrollArea* scrollUtils = new QScrollArea{tabUtils};
+    scrollUtils->setWidgetResizable(true);
+    scrollUtils->setFrameShape(QFrame::NoFrame);
+
+    QWidget* scrollUtilsContent = new QWidget();
+    verticalLayout = new QVBoxLayout{scrollUtilsContent};
     verticalLayout->setObjectName(u"verticalLayout"_s);
-    groupBox_5 = new QGroupBox{tabUtils};
+
+    groupBox_5 = new QGroupBox{scrollUtilsContent};
     groupBox_5->setObjectName(u"groupBox_5"_s);
     gridLayout_3 = new QGridLayout{groupBox_5};
     gridLayout_3->setObjectName(u"gridLayout_3"_s);
     gridLayout_3->setContentsMargins(6, 9, 6, 6);
+
     label_6 = new QLabel{groupBox_5};
     label_6->setObjectName(u"label_6"_s);
     label_6->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
-
     gridLayout_3->addWidget(label_6, 0, 1, 1, 1);
 
     label_8 = new QLabel{groupBox_5};
     label_8->setObjectName(u"label_8"_s);
     label_8->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
-
     gridLayout_3->addWidget(label_8, 0, 2, 1, 1);
 
     label_9 = new QLabel{groupBox_5};
     label_9->setObjectName(u"label_9"_s);
     label_9->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
-
     gridLayout_3->addWidget(label_9, 0, 3, 1, 1);
 
     label_7 = new QLabel{groupBox_5};
     label_7->setObjectName(u"label_7"_s);
     label_7->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
-
     gridLayout_3->addWidget(label_7, 1, 0, 1, 1);
 
     dsbxZeroX = new DoubleSpinBox{groupBox_5};
@@ -526,7 +541,6 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     dsbxZeroX->setDecimals(3);
     dsbxZeroX->setMinimum(-1000.0);
     dsbxZeroX->setMaximum(1000.0);
-
     gridLayout_3->addWidget(dsbxZeroX, 1, 1, 1, 1);
 
     dsbxZeroY = new DoubleSpinBox{groupBox_5};
@@ -535,20 +549,17 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     dsbxZeroY->setDecimals(3);
     dsbxZeroY->setMinimum(-1000.0);
     dsbxZeroY->setMaximum(1000.0);
-
     gridLayout_3->addWidget(dsbxZeroY, 1, 2, 1, 1);
 
     cbxZeroPos = new QComboBox{groupBox_5};
     cbxZeroPos->setObjectName(u"cbxZeroPos"_s);
     sizePolicy.setHeightForWidth(cbxZeroPos->sizePolicy().hasHeightForWidth());
     cbxZeroPos->setSizePolicy(sizePolicy);
-
     gridLayout_3->addWidget(cbxZeroPos, 1, 3, 1, 1);
 
     label_4 = new QLabel{groupBox_5};
     label_4->setObjectName(u"label_4"_s);
     label_4->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
-
     gridLayout_3->addWidget(label_4, 2, 0, 1, 1);
 
     dsbxHomeX = new DoubleSpinBox{groupBox_5};
@@ -557,7 +568,6 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     dsbxHomeX->setDecimals(3);
     dsbxHomeX->setMinimum(-1000.0);
     dsbxHomeX->setMaximum(1000.0);
-
     gridLayout_3->addWidget(dsbxHomeX, 2, 1, 1, 1);
 
     dsbxHomeY = new DoubleSpinBox{groupBox_5};
@@ -566,20 +576,17 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     dsbxHomeY->setDecimals(3);
     dsbxHomeY->setMinimum(-1000.0);
     dsbxHomeY->setMaximum(1000.0);
-
     gridLayout_3->addWidget(dsbxHomeY, 2, 2, 1, 1);
 
     cbxHomePos = new QComboBox{groupBox_5};
     cbxHomePos->setObjectName(u"cbxHomePos"_s);
     sizePolicy.setHeightForWidth(cbxHomePos->sizePolicy().hasHeightForWidth());
     cbxHomePos->setSizePolicy(sizePolicy);
-
     gridLayout_3->addWidget(cbxHomePos, 2, 3, 1, 1);
 
     label_5 = new QLabel{groupBox_5};
     label_5->setObjectName(u"label_5"_s);
     label_5->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
-
     gridLayout_3->addWidget(label_5, 3, 0, 1, 1);
 
     dsbxPinX = new DoubleSpinBox{groupBox_5};
@@ -587,7 +594,6 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     dsbxPinX->setDecimals(3);
     dsbxPinX->setMinimum(-1000.0);
     dsbxPinX->setMaximum(1000.0);
-
     gridLayout_3->addWidget(dsbxPinX, 3, 1, 1, 1);
 
     dsbxPinY = new DoubleSpinBox{groupBox_5};
@@ -595,46 +601,40 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     dsbxPinY->setDecimals(3);
     dsbxPinY->setMinimum(-1000.0);
     dsbxPinY->setMaximum(1000.0);
-
     gridLayout_3->addWidget(dsbxPinY, 3, 2, 1, 1);
 
     labelAPIcon = new QLabel{groupBox_5};
     labelAPIcon->setObjectName(u"labelAPIcon"_s);
-
     gridLayout_3->addWidget(labelAPIcon, 0, 0, 1, 1);
 
     verticalLayout->addWidget(groupBox_5);
 
-    chbxScaleHZMarkers = new QCheckBox{tabUtils};
+    chbxScaleHZMarkers = new QCheckBox{scrollUtilsContent};
     chbxScaleHZMarkers->setObjectName(u"chbxScaleHZMarkers"_s);
-
     verticalLayout->addWidget(chbxScaleHZMarkers);
 
-    chbxScalePinMarkers = new QCheckBox{tabUtils};
+    chbxScalePinMarkers = new QCheckBox{scrollUtilsContent};
     chbxScalePinMarkers->setObjectName(u"chbxScalePinMarkers"_s);
-
     verticalLayout->addWidget(chbxScalePinMarkers);
 
-    groupBox_4 = new QGroupBox{tabUtils};
+    groupBox_4 = new QGroupBox{scrollUtilsContent};
     groupBox_4->setObjectName(u"groupBox_4"_s);
     formLayout_3 = new QFormLayout{groupBox_4};
     formLayout_3->setObjectName(u"formLayout_3"_s);
     formLayout_3->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
     formLayout_3->setContentsMargins(6, 9, 6, 6);
+
     minimumCircleSegmentsLabel = new QLabel{groupBox_4};
     minimumCircleSegmentsLabel->setObjectName(u"minimumCircleSegmentsLabel"_s);
-
     formLayout_3->setWidget(0, QFormLayout::LabelRole, minimumCircleSegmentsLabel);
 
     sbxMinCircleSegments = new QSpinBox{groupBox_4};
     sbxMinCircleSegments->setObjectName(u"sbxMinCircleSegments"_s);
     sbxMinCircleSegments->setRange(36, 360);
-
     formLayout_3->setWidget(0, QFormLayout::FieldRole, sbxMinCircleSegments);
 
     minimumCircleSegmentLengthLabel = new QLabel{groupBox_4};
     minimumCircleSegmentLengthLabel->setObjectName(u"minimumCircleSegmentLengthLabel"_s);
-
     formLayout_3->setWidget(1, QFormLayout::LabelRole, minimumCircleSegmentLengthLabel);
 
     dsbxMinCircleSegmentLength = new DoubleSpinBox{groupBox_4};
@@ -643,15 +643,15 @@ void SettingsDialog::Ui::setupUi(QDialog* SettingsDialog) {
     dsbxMinCircleSegmentLength->setRange(0.1, 10.0);
     dsbxMinCircleSegmentLength->setSingleStep(0.05);
     dsbxMinCircleSegmentLength->setValue(0.50);
-
     formLayout_3->setWidget(1, QFormLayout::FieldRole, dsbxMinCircleSegmentLength);
 
     verticalLayout->addWidget(groupBox_4);
 
     verticalSpacer_2 = new QSpacerItem{20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding};
-
     verticalLayout->addItem(verticalSpacer_2);
 
+    scrollUtils->setWidget(scrollUtilsContent);
+    tabUtilsLayout->addWidget(scrollUtils);
     tabwMain->addTab(tabUtils, QString());
 
     gridLayout_2->addWidget(tabwMain, 0, 0, 1, 2);

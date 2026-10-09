@@ -1,13 +1,12 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// Este é um projeto de código aberto não comercial.
 /********************************************************************************
- * Author    :  Damir Bakiev                                                    *
- * Version   :  na                                                              *
- * Date      :  XXXXX XX, 2025                                                  *
- * Website   :  na                                                              *
- * Copyright :  Damir Bakiev 2016-2026                                          *
- * License   :                                                                  *
- * Use, modification & distribution is subject to Boost Software License Ver 1. *
+ * Autor    : Damir Bakiev                                                      *
+ * Versão   : na                                                                *
+ * Data     : XXXXX XX, 2026                                                    *
+ * Website  : na                                                                *
+ * Copyright: Damir Bakiev 2016-2026                                            *
+ * Licença  :                                                                   *
+ * Uso, modificação e distribuição estão sujeitos à Boost Software License Ver 1*
  * http://www.boost.org/LICENSE_1_0.txt                                         *
  ********************************************************************************/
 #include "abstract_fileplugin.h"
@@ -26,6 +25,7 @@
 #include <QPluginLoader>
 #include <QStandardPaths>
 #include <QSystemSemaphore>
+#include <QThread>
 #include <QTimer>
 
 int main(int argc, char* argv[]) {
@@ -39,14 +39,14 @@ int main(int argc, char* argv[]) {
 
     Q_INIT_RESOURCE(resources);
 
-    // Имена нужны до QApplication: по ним OpenGlCheck ищет QSettings и каталог
-    // для маркера незавершённого старта.
+    // Nomes necessários antes do QApplication: o OpenGlCheck busca o QSettings
+    // e o diretório para o marcador de inicialização incompleta através deles.
     QApplication::setApplicationName(u"GGEasy"_s);
     QApplication::setOrganizationName(VER_COMPANYNAME_STR);
     QApplication::setApplicationVersion(VER_PRODUCTVERSION_STR);
 
-    // Выбор режима OpenGL. Только до QApplication: атрибуты Qt::AA_Use*OpenGL
-    // и QT_OPENGL читаются при её конструировании.
+    // Seleção do modo OpenGL. Apenas antes do QApplication: os atributos
+    // Qt::AA_Use*OpenGL e QT_OPENGL são lidos durante sua construção.
     OpenGlCheck::selectMode(argc, argv);
 
     QApplication app{argc, argv};
@@ -67,40 +67,41 @@ int main(int argc, char* argv[]) {
     if(QDir dir(App::settingsPath()); !dir.exists())
         dir.mkpath(App::settingsPath());
 
-    // Закадровая проверка драйвера -- до первого QOpenGLWidget: он создаётся
-    // уже в конструкторе GraphicsView внутри MainWindow.
+    // Verificação do driver em segundo plano -- antes do primeiro QOpenGLWidget:
+    // ele já é criado no construtor do GraphicsView dentro do MainWindow.
     OpenGlCheck::probe();
     // QSettings::setDefaultFormat(QSettings::IniFormat);
     // QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, {});
 
-    // WTF ??? QGLFormat glf = QGLFormat::defaultFormat();
+    // Configuração de amostras GL
+    // QGLFormat glf = QGLFormat::defaultFormat();
     // glf.setSampleBuffers(true);
     // glf.setSamples(16);
     // QGLFormat::setDefaultFormat(glf);
 
     if constexpr(0) {
-        QSystemSemaphore semaphore{u"GGEasySemaphore"_s, 1}; // создаём семафор
-        semaphore.acquire();                                 // Поднимаем семафор, запрещая другим экземплярам работать с разделяемой памятью
+        QSystemSemaphore semaphore{u"GGEasySemaphore"_s, 1}; // Cria o semáforo
+        semaphore.acquire();                                   // Eleva o semáforo para impedir que outras instâncias acessem a memória compartilhada
 #ifdef Q_OS_UNIX
-        // в linux/unix разделяемая память не освобождается при аварийном завершении приложения,
-        // поэтому необходимо избавиться от данного мусора
+        // No Linux/Unix a memória compartilhada não é liberada em caso de encerramento anormal do aplicativo,
+        // por isso é necessário limpar estes resíduos
         QSharedMemory nix_fix_shared_memory{u"GGEasyMemory"_s};
         if(nix_fix_shared_memory.attach())
             nix_fix_shared_memory.detach();
 #endif
         // MainWindow* mainWin = nullptr;
-        QSharedMemory sharedMemory{u"GGEasyMemory"_s}; // Создаём экземпляр разделяемой памяти
+        QSharedMemory sharedMemory{u"GGEasyMemory"_s}; // Cria a instância de memória compartilhada
         auto instance = [&sharedMemory]() -> MainWindow*& { return *static_cast<MainWindow**>(sharedMemory.data()); };
-        bool is_running{};          // переменную для проверки ууже запущенного приложения
-        if(sharedMemory.attach()) { // пытаемся присоединить экземпляр разделяемой памяти к уже существующему сегменту
-            is_running = true;      // Если успешно, то определяем, что уже есть запущенный экземпляр
+        bool is_running{};          // Variável para verificar se o aplicativo já está em execução
+        if(sharedMemory.attach()) { // Tenta anexar a instância de memória compartilhada a um segmento existente
+            is_running = true;      // Se bem-sucedido, determina que já existe uma instância rodando
         } else {
-            sharedMemory.create(sizeof(void*)); // В противном случае выделяем размером с указатель кусок памяти   xxx1 байт памяти
-            is_running = false;                 // И определяем, что других экземпляров не запущено
+            sharedMemory.create(sizeof(void*)); // Caso contrário, aloca o tamanho de um ponteiro de memória
+            is_running = false;                 // E determina que nenhuma outra instância está rodando
         }
-        semaphore.release(); // Опускаем семафор
+        semaphore.release(); // Libera o semáforo
         QCommandLineParser parser;
-        parser.addPositionalArgument(u"url"_s, u"Url of file to open"_s);
+        parser.addPositionalArgument(u"url"_s, u"Url do arquivo a ser aberto"_s);
         parser.process(app);
         if(is_running) {
             system("pause");
@@ -112,15 +113,20 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    { // Splash Screen
-        auto splash = new QSplashScreen{QPixmap{u":/256.png"_s}};
+    { // Tela de Apresentação (Splash Screen)
+        QPixmap pixmap{u":/256.png"_s};
+        if(!pixmap.isNull()) {
+            pixmap = pixmap.scaled(600, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        }
+
+        auto splash = new QSplashScreen{pixmap};
         splash->setAttribute(Qt::WA_DeleteOnClose);
         splash->show();
         splash->connect(splash, &QObject::destroyed, splash, [] { App::splashScreen.set(nullptr); });
         App::splashScreen.set(splash);
     }
 
-    { // Translate
+    { // Idioma e Tradução
         QSettings settings;
         settings.beginGroup(u"MainWindow"_s);
         QString locale(settings.value(u"locale"_s).toString());
@@ -133,12 +139,10 @@ int main(int argc, char* argv[]) {
 
     if(0) return ToolDatabase{}.exec();
 
-    // Инстансы плагинов удаляются ЗДЕСЬ, а не статическим деструктором Qt
-    // (QLibraryStore::cleanup при __cxa_finalize): тот срабатывает уже после
-    // разрушения QApplication, и деструкторы форм/редакторов плагинов
-    // (QSettings, QWidget) падают. Объявлено до mainWin, чтобы разрушиться
-    // после неё: сцена и модели ещё держат объекты плагинов и ходят в них.
-    // Сами .so при этом не выгружаются (см. комментарий после app.exec()).
+    // Instâncias dos plugins são removidas AQUI e não pelo destrutor estático do Qt
+    // (QLibraryStore::cleanup durante __cxa_finalize): este é disparado após a
+    // destruição do QApplication, o que causaria crash nos destrutores das janelas/editores dos plugins.
+    // Declarado antes da mainWin para ser destruído após ela.
     struct PluginHolder {
         std::vector<std::unique_ptr<QPluginLoader>> loaders;
         ~PluginHolder() {
@@ -152,12 +156,12 @@ int main(int argc, char* argv[]) {
     mainWin.setObjectName(u"MainWindow"_s);
 
     /*
-    Platform        Valid suffixes
-    Windows         .dll, .DLL
-    Unix/Linux      .so
-    AIX             .a
-    HP-UX           .sl, .so (HP-UXi)
-    macOS and iOS .dylib, .bundle, .so
+    Plataforma       Sufixos válidos
+    Windows          .dll, .DLL
+    Unix/Linux       .so
+    AIX              .a
+    HP-UX            .sl, .so (HP-UXi)
+    macOS e iOS      .dylib, .bundle, .so
     */
 #ifdef Q_OS_UNIX
     #ifdef QT_DEBUG
@@ -168,19 +172,19 @@ int main(int argc, char* argv[]) {
 #elif defined(Q_OS_WIN)
     const auto suffix = u"*.dll"_s;
 #else
-    static_assert(false, u"Select OS"_s);
+    static_assert(false, u"Selecione o Sistema Operacional"_s);
 #endif
 
-    // load plugins
+    // Carregamento de plugins
     QDir dir(QApplication::applicationDirPath() + u"/plugins"_s);
-    if(dir.exists()) { // Поиск всех файлов в папке u"plugins"_s
+    if(dir.exists()) { // Busca todos os arquivos no diretório u"plugins"_s
         QStringList listFiles(dir.entryList(QStringList(suffix), QDir::Files));
-        auto text = QObject::tr("Load plugin %1\n\n\n");
-        for(const auto& str: listFiles) { // Проход по всем файлам
+        auto text = QObject::tr("Carregando plugin %1\n\n\n");
+        for(const auto& str: listFiles) { // Itera sobre todos os arquivos
             App::splashScreen().showMessage(text.arg(str),
                 Qt::AlignBottom | Qt::AlignHCenter, Qt::white);
             loaders.emplace_back(std::make_unique<QPluginLoader>(dir.absolutePath() + u"/"_s + str));
-            if(auto* pobj = loaders.back()->instance(); pobj) { // Загрузка плагина
+            if(auto* pobj = loaders.back()->instance(); pobj) { // Carrega o plugin
                 PluginData* pd{};
                 if(auto* gCode = qobject_cast<GCode::Plugin*>(pobj)) {
                     pd = App::gCodePlugins()
@@ -209,13 +213,12 @@ int main(int argc, char* argv[]) {
 
     SettingsDialog();
     MainWindow::updateTheme();
-    mainWin.init(); // connect plugins
+    mainWin.init(); // Conecta os plugins
 
     QCommandLineParser parser;
-    parser.addPositionalArgument(u"url"_s, u"Url of file to open"_s);
-    // Значение читает OpenGlCheck::selectMode ещё до QApplication; здесь ключ
-    // объявлен, чтобы process() не отверг его как неизвестный и чтобы он попал
-    // в --help.
+    parser.addPositionalArgument(u"url"_s, u"Url do arquivo a ser aberto"_s);
+    // O valor é lido pelo OpenGlCheck::selectMode antes do QApplication; a opção é
+    // declarada aqui para que o process() não a rejeite como desconhecida e ela apareça no --help.
     parser.addOption(OpenGlCheck::commandLineOption());
     parser.process(app);
     std::vector<std::string_view> cli{
@@ -227,23 +230,24 @@ int main(int argc, char* argv[]) {
         mainWin.loadFile(fileName);
 
     mainWin.show();
+
+    // Mantém a tela de apresentação (splash) visível por pelo menos 2.5 segundos
+    qApp->processEvents();
+    QThread::msleep(2500);
     App::splashScreen().finish(&mainWin);
 
-    // Только теперь: окно с логом появилось вместе с mainWin, а проверка
-    // графики отработала задолго до неё.
+    // Registro do status da placa de vídeo e OpenGL
     OpenGlCheck::logStatus();
 
-    // Маркер снимаем с задержкой: контекст GL создаётся и первый кадр рисуется
-    // уже после show(), и валится драйвер обычно именно там. Снять маркер
-    // раньше -- значит не заметить падение и загрузиться так же в следующий раз.
+    // O marcador de inicialização bem-sucedida é removido com atraso de 5 segundos
     QTimer::singleShot(5000, &mainWin, [] { OpenGlCheck::markStartupSucceeded(); });
 
     int retCode = app.exec();
 
-    // Плагины на выходе НЕ выгружаются: в сцене и моделях к этому моменту
-    // ещё живут объекты с vtable из .so (шейпы, элементы файлов), и dlclose
-    // до их разрушения — гарантированный крэш. Процесс завершается, ОС
-    // освободит библиотеки сама.
+    // Os plugins NÃO são descarregados na saída: na cena e modelos ainda existem
+    // objetos apontando para a vtable das bibliotecas (.so), e invocar dlclose
+    // antes de sua destruição causaria uma falha de segmentação (crash).
+    // O sistema operacional liberará as bibliotecas ao encerrar o processo.
 
     return retCode;
 }
