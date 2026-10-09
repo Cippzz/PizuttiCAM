@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>701</width>
-    <height>229</height>
+    <width>748</width>
+    <height>332</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -29,7 +29,7 @@
    <item>
     <widget class="QLabel" name="label_2">
      <property name="text">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; color:#ff0000;&quot;&gt;This is a &amp;quot;Beta version&amp;quot; and does not reflect the final quality of the software.&lt;br/&gt;The program is provided AS IS without any guarantees or warranty.&lt;br/&gt;Use at your own risk.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This is a &amp;quot;Beta version&amp;quot; based on the original GGEasy (GERBER_X3) project by Damir Bakiev, packaged and distributed in AppImage format.&lt;/p&gt;&lt;p&gt;The program is provided AS IS without any guarantees or warranty. Use at your own risk.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -39,10 +39,10 @@
    <item>
     <widget class="QLabel" name="lblAbout">
      <property name="text">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Build: %1&lt;br/&gt;Visit: &lt;a href=&quot;https://github.com/XRay3D/GERBER_X3/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;https://github.com/XRay3D/GERBER_X3/&lt;/span&gt;&lt;/a&gt;&lt;a href=&quot;https://github.com/Denvi/Candle/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;&lt;br/&gt;&lt;/span&gt;&lt;/a&gt;© 2017-2024 Damir Bakiev&lt;br/&gt;License: GNU GENERAL PUBLIC LICENSE&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;%1&lt;br/&gt;Visit: &lt;a href=&quot;https://github.com/Cippzz/PizuttiCAM&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#308cc6;&quot;&gt;https://github.com/Cippzz/PizuttiCAM&lt;/span&gt;&lt;/a&gt;&lt;a href=&quot;https://github.com/Denvi/Candle/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;&lt;br/&gt;&lt;/span&gt;&lt;/a&gt;© 2026 Cícero Pizutti&lt;br/&gt;License: GNU GENERAL PUBLIC LICENSE&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="alignment">
-      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+      <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
      </property>
     </widget>
    </item>
@@ -746,7 +746,7 @@ Public License instead of this License.  But first, please read
      <item>
       <spacer name="horizontalSpacer_4">
        <property name="orientation">
-        <enum>Qt::Horizontal</enum>
+        <enum>Qt::Orientation::Horizontal</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
