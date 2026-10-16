@@ -1,0 +1,99 @@
+app-id: org.pizutticam.PizuttiCAM
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+command: GGEasy
+
+finish-args:
+  - --socket=x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=host
+  - --share=ipc
+
+build-options:
+  build-args:
+    - --share=network
+
+modules:
+  - name: gcc16
+    buildsystem: autotools
+    builddir: true
+    config-opts:
+      - --enable-languages=c,c++
+      - --disable-multilib
+      - --disable-bootstrap
+      - --disable-nls
+    sources:
+      - type: archive
+        url: https://sourceware.org/pub/gcc/releases/gcc-16.2.0/gcc-16.2.0.tar.xz
+        sha256: e6738e29597f733270731aa90600f37ffdc045079dfc27ec7e8192cc81085c3e
+      - type: shell
+        commands:
+          - ./contrib/download_prerequisites
+
+  - name: boost
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: archive
+        url: https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.xz
+        sha256: 0a9cc56ceae46986f5f4d43fe0311d90cf6d2fa9028258a95cab49ffdacf92ad
+
+  - name: cgal
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: archive
+        url: https://github.com/CGAL/cgal/releases/download/v6.2/CGAL-6.2.tar.xz
+        sha256: fbc32816745e871a5cbdeb6245317e9dbf10ae1a957b0ab1edb00b4fde00ba8d
+
+  - name: tbb
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DTBB_TEST=OFF
+      - -DTBB_STRICT=OFF
+    sources:
+      - type: archive
+        url: https://github.com/uxlfoundation/oneTBB/archive/refs/tags/v2023.0.0.tar.gz
+        sha256: f8767b971ec6aea25dde58ae0f593e94e7aa75a739a86f67967012f69e2199b1
+
+  - name: pizutticam
+    buildsystem: cmake-ninja
+    builddir: true
+    build-options:
+      env:
+        CPATH: /app/include
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DGERBER_NATIVE_MARCH=OFF
+      - -DCMAKE_PREFIX_PATH=/app
+      - -DBoost_DIR=/app/lib/cmake/Boost-1.85.0
+      - -DCMAKE_C_COMPILER=/app/bin/gcc
+      - -DCMAKE_CXX_COMPILER=/app/bin/g++
+    post-install:
+      - |
+        set -e
+        D=$(dirname "$(find /run/build/pizutticam -name libggcore.so | head -n1)")
+        test -f "$D/libggcore.so"
+        echo "Copiando de $D"
+        for f in "$D"/*; do
+          [ "$(basename "$f")" = GGEasy ] || cp -a "$f" /app/bin/
+        done
+    sources:
+      - type: dir
+        path: .
+        skip:
+          - bin
+          - build-dir
+          - third_party
+          - .flatpak-builder
+          - .git
