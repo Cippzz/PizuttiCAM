@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PizuttiCAM
+Comment=CAM para gerar G-code de fresamento de placas de circuito impresso
+Exec=GGEasy
+Icon=org.pizutticam.PizuttiCAM
+Categories=Graphics;Engineering;Electronics;
+Terminal=false

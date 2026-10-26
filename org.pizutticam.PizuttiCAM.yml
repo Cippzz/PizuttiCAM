@@ -97,3 +97,15 @@ modules:
           - third_party
           - .flatpak-builder
           - .git
+  
+  - name: pizutticam-desktop
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 org.pizutticam.PizuttiCAM.desktop -t /app/share/applications
+      - install -Dm644 org.pizutticam.PizuttiCAM.png /app/share/icons/hicolor/256x256/apps/org.pizutticam.PizuttiCAM.png
+    sources:
+      - type: file
+        path: org.pizutticam.PizuttiCAM.desktop
+      - type: file
+        path: ggeasy/myapp.png
+        dest-filename: org.pizutticam.PizuttiCAM.png   

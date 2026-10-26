@@ -2,14 +2,19 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 
 /********************************************************************************
- * Author : Damir Bakiev                                                         *
- * Version : na                                                                  *
- * Date : 11 November 2021                                                       *
- * Website : na                                                                  *
- * Copyright : Damir Bakiev 2016-2026                                            *
- * License:                                                                      *
- * Use, modification & distribution is subject to Boost Software License Ver 1.  *
- * http://www.boost.org/LICENSE_1_0.txt                                          *
+ * Author : Damir Bakiev                                                        *
+ * Version : na                                                                 *
+ * Date : 11 November 2021                                                      *
+ * Website : na                                                                 *
+ * Copyright : Damir Bakiev 2016-2026                                           *
+ * License:                                                                     *
+ * Use, modification & distribution is subject to Boost Software License Ver 1. *
+ * http://www.boost.org/LICENSE_1_0.txt                                         *
+ *                                                                              *
+ * Modificações (Projeto PizuttiCAM):                                           *
+ * - Adicionada verificação para forçar a extensão .gcode na exportação          *
+ *   de caminhos de ferramenta selecionados (saveSelectedGCodeFiles)            *
+ * - Tradução de todos os comentários em russo para português (PT-BR)           *
  ********************************************************************************/
 // #include "a_pch.h"
 
@@ -37,7 +42,7 @@
 #include <QPrinter>
 // #include <QtWidgets>
 
-// static auto PointConverter = QMetaType::registerConverter(&Point::toString); NOTE
+// static auto PointConverter = QMetaType::registerConverter(&Point::toString); NOTA
 
 inline constexpr auto G_CODE_PROPERTIES = "GCodeProperties"_hash32;
 
@@ -81,7 +86,7 @@ MainWindow::MainWindow(QWidget* parent)
     ui.grView->scene()->addItem(lfp = new LayoutFrames());
 
     connect(ui.grView, &GraphicsView::fileDroped, this, &MainWindow::loadFile);
-    connect(ui.grView, &GraphicsView::mouseMove, this, [this](const QPointF& point) { // status bar
+    connect(ui.grView, &GraphicsView::mouseMove, this, [this](const QPointF& point) { // barra de status
         ui.statusbar->showMessage(u"X = %1, Y = %2"_s.arg(point.x()).arg(point.y()));
     });
 
@@ -109,10 +114,10 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(ui.treeView, &FileTree::View::saveGCodeFile, this, &MainWindow::saveGCodeFile);
     connect(ui.treeView, &FileTree::View::editGCodeFile, this, &MainWindow::editGcFile);
-    connect(ui.treeView, &FileTree::View::saveGCodeFiles, this, &MainWindow::saveGCodeFiles); // NOTE unused
+    connect(ui.treeView, &FileTree::View::saveGCodeFiles, this, &MainWindow::saveGCodeFiles); // NOTA não utilizado
     connect(ui.treeView, &FileTree::View::saveSelectedGCodeFiles, this, &MainWindow::saveSelectedGCodeFiles);
 
-    connect(this, &MainWindow::logMessage, this, &MainWindow::loggingHandler, Qt::QueuedConnection); // thread safe logging
+    connect(this, &MainWindow::logMessage, this, &MainWindow::loggingHandler, Qt::QueuedConnection); // log seguro para threads
 }
 
 MainWindow::~MainWindow() {
@@ -124,22 +129,22 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::init() {
-    for(auto& [type, ptr]: App::filePlugins()) { // connect plugins
+    for(auto& [type, ptr]: App::filePlugins()) { // conectar plugins
         ptr->moveToThread(&parserThread);
         connect(ptr, &AbstractFilePlugin::fileError, this, &MainWindow::fileError, Qt::QueuedConnection);
         connect(ptr, &AbstractFilePlugin::fileProgress, this, &MainWindow::fileProgress, Qt::QueuedConnection);
         connect(ptr, &AbstractFilePlugin::fileCanceled, this, &MainWindow::fileCanceled, Qt::QueuedConnection);
         connect(ptr, &AbstractFilePlugin::fileReady, this, &MainWindow::addFileToPro, Qt::QueuedConnection);
         connect(ptr, &AbstractFilePlugin::setDockWidget, this, &MainWindow::setDockWidget);
-        // Именно parseFileTask, а не parseFile: обёртка заводит область отмены,
-        // без неё кнопка отмены у строки ничего не остановит.
+        // Exatamente parseFileTask, e não parseFile: o wrapper cria uma área de cancelamento,
+        // sem ela o botão de cancelamento na linha não interrompe nada.
         connect(this, &MainWindow::parseFile, ptr, &AbstractFilePlugin::parseFileTask, Qt::QueuedConnection);
         connect(project_, &Project::reloadFile, ptr, &AbstractFilePlugin::parseFileTask, Qt::QueuedConnection);
     }
 
-    // Перезагрузку по изменению файла на диске инициирует Project, минуя
-    // loadFile, -- строку в окне заводим здесь, иначе у неё не было бы ни
-    // прогресса, ни кнопки отмены.
+    // A recarga devido à alteração do arquivo no disco é iniciada pelo Project, ignorando o
+    // loadFile -- a linha na janela é criada aqui, caso contrário não teria nem
+    // progresso nem botão de cancelamento.
     connect(project_, &Project::reloadFile, this, [this](const QString& fileName, int type) {
         if(auto* plugin = App::filePlugin(static_cast<uint32_t>(type))) {
             loadingBy_[fileName] = plugin;
@@ -149,7 +154,7 @@ void MainWindow::init() {
 
     initWidgets();
 
-    // FIXME GCode::PropertiesForm(); // init default vars;
+    // FIXME GCode::PropertiesForm(); // inicializa variáveis padrão;
 
     setCurrentFile(QString());
     loadSettings();
@@ -187,11 +192,11 @@ void MainWindow::loggingHandler(QtMsgType type, const QStringList& context, cons
     };
     auto file = context[File].split(u'/').back();
     static constexpr QColor color[]{
-        QColor{128, 128, 128}, // gray   QtDebugMsg
-        QColor{255, 128, 000}, // orange QtWarningMsg
-        QColor{255, 000, 000}, // red    QtCriticalMsg
-        QColor{255, 000, 000}, // red    QtFatalMsg
-        QColor{128, 128, 255}, // blue   QtInfoMsg
+        QColor{128, 128, 128}, // cinza   QtDebugMsg
+        QColor{255, 128, 000}, // laranja QtWarningMsg
+        QColor{255, 000, 000}, // vermelho QtCriticalMsg
+        QColor{255, 000, 000}, // vermelho QtFatalMsg
+        QColor{128, 128, 255}, // azul    QtInfoMsg
     };
     ui.loggingTextBrowser->setTextColor(color[type]);
     ui.loggingTextBrowser->insertPlainText(message);
@@ -219,11 +224,10 @@ void MainWindow::loadFile(const QString& fileName) {
             return;
         for(auto& [type, ptr]: App::filePlugins()) {
             if(ptr->thisIsIt(fileName)) {
-                // Строка в окне заводится СРАЗУ, а не по первому fileProgress:
-                // разбор идёт в очереди одного parserThread, и до своего
-                // прогресса файл может ждать сколько угодно -- всё это время
-                // его надо и показывать, и давать отменить. Плюс прогресс
-                // шлёт не всякий плагин.
+                // A linha na janela é criada IMEDIATAMENTE, e não no primeiro fileProgress:
+                // a análise roda na fila de uma única parserThread e, até chegar a sua vez,
+                // o arquivo pode esperar bastante -- durante todo esse tempo ele deve ser
+                // exibido e permitir cancelamento. Além disso, nem todo plugin envia progresso.
                 loadingBy_[fileName] = ptr;
                 loadProgress()->addTask(fileName);
                 emit parseFile(fileName, int(type));
@@ -244,10 +248,9 @@ LoadProgressDialog* MainWindow::loadProgress() {
 }
 
 void MainWindow::cancelLoading(const QString& fileName) {
-    // Собственно остановкой занимается плагин: у него стоп-токен, который
-    // видит парсер. Строку отсюда не убираем -- она исчезнет, когда плагин
-    // отчитается (fileCanceled/fileProgress(1,1)), иначе окно врало бы об
-    // остановке ещё не остановленного разбора.
+    // A interrupção é feita pelo plugin: ele possui o token de parada verificado pelo parser.
+    // Não removemos a linha daqui -- ela sumirá quando o plugin notificar (fileCanceled/fileProgress(1,1)),
+    // caso contrário a janela mentiria sobre a parada de uma análise ainda em andamento.
     if(auto* plugin = loadingBy_.value(fileName)) plugin->requestCancel(fileName);
 }
 
@@ -273,12 +276,12 @@ void MainWindow::fileError(const QString& fileName, const QString& error) {
 }
 
 void MainWindow::fileProgress(const QString& fileName, int max, int value) {
-    // Протокол плагинов: (max>0, value==0) -- старт, (1,1) -- конец, иначе шаг.
-    // Строка уже заведена в loadFile, поэтому старт только уточняет максимум.
+    // Protocolo dos plugins: (max>0, value==0) -- início, (1,1) -- término, senão passo.
+    // A linha já foi criada em loadFile, portanto o início apenas refina o valor máximo.
     //
-    // Прежний код обращался к QMap::operator[] и на «конце»/«шаге» без старта
-    // вставлял туда nullptr, который тут же разыменовывал. Путь был реальный:
-    // пустой gerber шлёт fileProgress(name, 0, 0) сразу после fileError.
+    // O código antigo acessava QMap::operator[] e, no "fim"/"passo" sem "início",
+    // inseria nullptr que era desreferenciado imediatamente. Caminho real:
+    // um arquivo Gerber vazio envia fileProgress(name, 0, 0) logo após fileError.
     if(max == 1 && value == 1) {
         loadingBy_.remove(fileName);
         if(loadProgress_) loadProgress_->removeTask(fileName);
@@ -287,11 +290,11 @@ void MainWindow::fileProgress(const QString& fileName, int max, int value) {
 }
 
 void MainWindow::fileCanceled(const QString& fileName) {
-    qInfo() << "загрузка отменена:" << fileName;
+    qInfo() << "carregamento cancelado:" << fileName;
     loadingBy_.remove(fileName);
     if(loadProgress_) loadProgress_->removeTask(fileName);
-    // Отменяли перезагрузку -- снять пометку «этот файл уже перезагружается»,
-    // её ставит watcher и снимает только успешный Project::reload.
+    // Cancelou a recarga -- remove a marcação "este arquivo já está recarregando",
+    // informada pelo watcher e removida apenas em caso de Project::reload bem-sucedido.
     project_->reloadAborted(fileName);
 }
 
@@ -367,7 +370,7 @@ void MainWindow::printDialog() {
     QPrintPreviewDialog preview{&printer, this};
     connect(&preview, &QPrintPreviewDialog::paintRequested, [](QPrinter* pPrinter) {
         // ScopedTrue sTrue(App::app_->drawPdf_);
-        // NOTE App::setDrawPdf(true);
+        // NOTA App::setDrawPdf(true);
         QRectF rect;
         for(QGraphicsItem* item: App::grView().items())
             if(item->isVisible() && !item->boundingRect().isNull())
@@ -386,7 +389,7 @@ void MainWindow::printDialog() {
         App::grView().scene()->render(&painter,
             QRectF(0, 0, pPrinter->width(), pPrinter->height()),
             rect, Qt::KeepAspectRatio /*IgnoreAspectRatio*/);
-        // NOTE App::setDrawPdf(false);
+        // NOTA App::setDrawPdf(false);
     });
     preview.exec();
 }
@@ -458,7 +461,7 @@ void MainWindow::saveSettings() {
     settings.setValue(u"state"_s, saveState());
     settings.setValue(u"lastPath"_s, lastPath);
     settings.setValue(u"project"_s, project_->name());
-    // toolBar actions visible
+    // visibilidade das ações na barra de ferramentas
     for(auto toolBar: findChildren<QToolBar*>()) {
         settings.beginWriteArray(toolBar->objectName());
         int ctr{};
@@ -506,13 +509,13 @@ void MainWindow::createActions() {
     createActionsFile();
     // zoomToolBar
     createActionsZoom();
-    // fileEdit // Selection / Delete selected
+    // fileEdit // Seleção / Excluir selecionados
     createActionsEdit();
     // serviceMenu
     createActionsService();
     // toolpathToolBar
     createActionsToolPath();
-    // grafica
+    // gráfica
     createActionsShape();
     // helpMenu
     createActionsHelp();
@@ -531,31 +534,31 @@ void MainWindow::createActionsFile() {
     fileToolBar->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(fileToolBar, &QToolBar::customContextMenuRequested, this, &MainWindow::customContextMenuForToolBar);
     QAction* action;
-    // New
+    // Novo
     action = fileMenu->addAction(QIcon::fromTheme(u"project-development-new-template"_s), tr("&New project"), this, &MainWindow::newFile);
     action->setShortcuts(QKeySequence::New);
     action->setStatusTip(tr("Create a new file"));
     fileToolBar->addAction(QIcon::fromTheme(u"project-development-new-template"_s), tr("&New project"), this, &MainWindow::newFile);
 
-    // Open
+    // Abrir
     action = fileMenu->addAction(QIcon::fromTheme(u"document-open"_s), tr("&Open..."), this, &MainWindow::open);
     action->setShortcuts(QKeySequence::Open);
     action->setStatusTip(tr("Open an existing file"));
     fileToolBar->addAction(QIcon::fromTheme(u"document-open"_s), tr("&Open..."), this, &MainWindow::open);
 
-    // Save
+    // Salvar
     action = fileMenu->addAction(QIcon::fromTheme(u"document-save"_s), tr("&Save project"), this, &MainWindow::save);
     action->setShortcuts(QKeySequence::Save);
     action->setStatusTip(tr("Save the document to disk"));
     fileToolBar->addAction(QIcon::fromTheme(u"document-save"_s), tr("&Save project"), this, &MainWindow::save);
 
-    // Save As
+    // Salvar Como
     action = fileMenu->addAction(QIcon::fromTheme(u"document-save-as"_s), tr("Save project &As..."), this, &MainWindow::saveAs);
     action->setShortcuts(QKeySequence::SaveAs);
     action->setStatusTip(tr("Save the document under a new name"));
     fileToolBar->addAction(QIcon::fromTheme(u"document-save-as"_s), tr("Save project &As..."), this, &MainWindow::saveAs);
 
-    // Close project
+    // Fechar projeto
     closeAllAct_ = fileMenu->addAction(QIcon::fromTheme(u"document-close"_s), tr("&Close project \"%1\""), this, &MainWindow::closeProject);
     closeAllAct_->setShortcuts(QKeySequence::Close);
     closeAllAct_->setStatusTip(tr("Close project"));
@@ -565,12 +568,12 @@ void MainWindow::createActionsFile() {
     fileMenu->addSeparator();
     fileToolBar->addSeparator();
 
-    // Save Selected Tool Paths
+    // Salvar Caminhos de Ferramenta Selecionados
     action = fileMenu->addAction(QIcon::fromTheme(u"document-save-all"_s), tr("&Save Selected Tool Paths..."), this, &MainWindow::saveSelectedGCodeFiles);
     action->setStatusTip(tr("Save selected toolpaths"));
     fileToolBar->addAction(QIcon::fromTheme(u"document-save-all"_s), tr("&Save Selected Tool Paths..."), this, &MainWindow::saveSelectedGCodeFiles);
 
-    // Export PDF
+    // Exportar PDF
     action = fileMenu->addAction(QIcon::fromTheme(u"acrobat"_s), tr("&Export PDF..."), this, &MainWindow::renderPdf);
     action->setStatusTip(tr("Export to PDF file"));
     fileToolBar->addAction(QIcon::fromTheme(u"acrobat"_s), tr("&Export PDF..."), this, &MainWindow::renderPdf);
@@ -601,9 +604,9 @@ void MainWindow::createActionsEdit() {
     action = editMenu->addAction(QIcon::fromTheme(u"edit-select-all"_s), tr("Select all"), this, &MainWindow::selectAll);
     action->setShortcut(QKeySequence::SelectAll);
 
-    auto dsaShortcut = new QShortcut{this};                                      // Инициализируем объект
-    dsaShortcut->setKey(Qt::Key_Escape);                                         // Устанавливаем код клавиши
-    connect(dsaShortcut, &QShortcut::activated, this, &MainWindow::deSelectAll); // цепляем обработчик нажатия клавиши
+    auto dsaShortcut = new QShortcut{this};                                       // Inicializamos o objeto
+    dsaShortcut->setKey(Qt::Key_Escape);                                         // Definimos a tecla de atalho
+    connect(dsaShortcut, &QShortcut::activated, this, &MainWindow::deSelectAll); // Conectamos o manipulador de pressionamento de tecla
 
     editMenu->addSeparator();
 
@@ -630,13 +633,13 @@ void MainWindow::createActionsService() {
     toolpathToolBar->addSeparator();
 
     QAction* action;
-    // Settings
+    // Configurações
     action = serviceMenu->addAction(QIcon::fromTheme(u"configure-shortcuts"_s), tr("&Settings"), [this] { SettingsDialog(this).exec(); });
     action->setStatusTip(tr("Show the application's settings box"));
-    // Separator
+    // Separador
     // toolpathToolBar->addSeparator();
     serviceMenu->addSeparator();
-    // G-Code Properties
+    // Propriedades do G-Code
     serviceMenu->addAction(action = toolpathToolBar->addAction(QIcon::fromTheme(u"node"_s), tr("&G-Code Properties")));
     connect(action, &QAction::toggled, this, [pf = GCode::PropertiesForm::create(nullptr /*this*/), this](bool checked) {
         if(checked) setDockWidget(pf.get());
@@ -649,11 +652,11 @@ void MainWindow::createActionsService() {
     action->setCheckable(true);
     toolpathActions.try_emplace(G_CODE_PROPERTIES, action);
     actionGroup.addAction(action);
-    // Tool Base
+    // Base de Ferramentas
     serviceMenu->addAction(toolpathToolBar->addAction(QIcon::fromTheme(u"view-form"_s), tr("Tool Base"), [this] { ToolDatabase(this, {}).exec(); }));
-    // Separator
+    // Separador
     serviceMenu->addAction(toolpathToolBar->addSeparator());
-    // Autoplace All Refpoints
+    // Posicionar Automaticamente Todos os Pontos de Referência
     serviceMenu->addAction(toolpathToolBar->addAction(QIcon::fromTheme(u"snap-nodes-cusp"_s), tr("Autoplace All Refpoints"), [this] {
         if(updateRect()) {
             Gi::Pin::resetPos(false);
@@ -662,17 +665,17 @@ void MainWindow::createActionsService() {
         }
         ui.grView->zoomFit();
     }));
-    // Separator
+    // Separador
     serviceMenu->addAction(toolpathToolBar->addSeparator());
-    // Snap to grid
+    // Alinhar à grade
     serviceMenu->addAction(action = toolpathToolBar->addAction(QIcon::fromTheme(u"snap-to-grid"_s), tr("Snap to grid"), [](bool checked) { App::settings().setSnap(checked); }));
     action->setCheckable(true);
-    // Separator
+    // Separador
     serviceMenu->addAction(toolpathToolBar->addSeparator());
     serviceMenu->addAction(action = toolpathToolBar->addAction(QIcon::fromTheme(u"ruller-on"_s), tr("Ruller"), ui.grView, &GraphicsView::setRuler));
     action->setCheckable(true);
-    // Resize
-    if(App::isDebug() && 0) { // (need for debug)
+    // Redimensionar
+    if(App::isDebug() && 0) { // (necessário para depuração)
         serviceMenu->addSeparator();
         toolpathToolBar->addSeparator();
         serviceMenu->addAction(toolpathToolBar->addAction(QIcon::fromTheme(u"snap-nodes-cusp"_s), tr("Resize"), [this] {
@@ -684,15 +687,15 @@ void MainWindow::createActionsService() {
 void MainWindow::createActionsHelp() {
     helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* action;
-    // About
+    // Sobre
     action = helpMenu->addAction(tr("&About"), this, &MainWindow::about);
     action->setStatusTip(tr("Show the application's About box"));
-    // About Qt
+    // Sobre o Qt
     action = helpMenu->addAction(tr("About &Qt"), qApp, &QApplication::aboutQt);
     action->setStatusTip(tr("Show the Qt library's About box"));
-    // Separator
+    // Separador
     helpMenu->addSeparator();
-    // About Plugins
+    // Sobre os Plugins
     action = helpMenu->addAction(tr("About &Plugins…"), this, [this] { DialogAboutPlugins(this).exec(); });
     action->setStatusTip(tr("Show loaded plugins…"));
 }
@@ -709,7 +712,7 @@ void MainWindow::createActionsZoom() {
     connect(zoomToolBar, &QToolBar::customContextMenuRequested, this, &MainWindow::customContextMenuForToolBar);
 
     QAction* action;
-    // Fit best
+    // Ajustar melhor
     zoomToolBar->addAction(QIcon::fromTheme(u"zoom-fit-best"_s), tr("Fit best"), ui.grView, &GraphicsView::zoomFit);
     action = vievMenu->addAction(QIcon::fromTheme(u"zoom-fit-best"_s), tr("Fit best"), ui.grView, &GraphicsView::zoomFit);
     action->setShortcut(QKeySequence::FullScreen);
@@ -733,11 +736,11 @@ void MainWindow::createActionsZoom() {
     action->setShortcut(QKeySequence::ZoomOut);
     vievMenu->addAction(action);
 
-    // Separator
+    // Separador
     zoomToolBar->addSeparator();
     vievMenu->addSeparator();
 
-    // Zoom to selected
+    // Zoom no selecionado
     zoomToolBar->addAction(QIcon::fromTheme(u"zoom-to-selected"_s), tr("Zoom to selected"), ui.grView, &GraphicsView::zoomToSelected);
     action = vievMenu->addAction(QIcon::fromTheme(u"zoom-to-selected"_s), tr("Zoom to selected"), ui.grView, &GraphicsView::zoomToSelected);
     action->setShortcut(QKeySequence(u"F12"_s));
@@ -748,10 +751,9 @@ void MainWindow::createActionsToolPath() {
     if(!App::gCodePlugins().size())
         return;
 
-    // Wire up default JS script paths now, at plugin-load time, rather than
-    // waiting for the user to open Settings (GCode::Tab::readSettings is the
-    // only other caller) — otherwise a plugin whose toolpath is JS-only
-    // (e.g. Threading) silently produces nothing until Settings is opened once.
+    // Configura os caminhos padrão dos scripts JS agora, no momento do carregamento dos plugins,
+    // em vez de esperar que o usuário abra as Configurações (GCode::Tab::readSettings é o único outro ponto) —
+    // caso contrário, um plugin cujo caminho seja apenas em JS (ex: Threading) não gera nada silenciosamente até abrir as Configurações.
     GCode::File::ensureDefaultScripts();
 
     QMenu* menu = menuBar()->addMenu(tr("&Paths"));
@@ -793,21 +795,20 @@ void MainWindow::createActionsShape() {
     for(auto& [type, shPlugin]: App::shapePlugins()) {
         auto action = toolBar->addAction(shPlugin->icon(), shPlugin->name());
         action->setCheckable(true);
-        // Заголовок док-панели берётся из windowTitle редактора, а редактор
-        // создаётся раньше, чем плагину подложат description.json -- ставим здесь.
+        // O título do dock de ferramentas é obtido a partir de windowTitle do editor, e o editor
+        // é criado antes do plugin receber o description.json -- definimos aqui.
         if(auto* editor = shPlugin->editor()) editor->setWindowTitle(shPlugin->name());
         actionGroup.addAction(action);
         connect(shPlugin, &Shapes::Plugin::actionUncheck, action, &QAction::setChecked);
-        // Двойной клик по фигуре: показать редактор и подсветить его кнопку в
-        // тулбаре (exclusive-группа сама снимет выделение с прежнего типа).
-        // Свойство -- одноразовый флаг для toggled ниже: highlight существующей
-        // фигуры не должен включать режим вставки НОВОЙ (коннект мыши на
-        // addPoint) -- иначе двойной клик по фигуре тут же начинал бы лепить
-        // вторую поверх неё. setChecked() эмитит toggled() синхронно, так что
-        // к setProperty(false) после него флаг уже прочитан (если вообще
-        // менялся: если кнопка и так была активна, toggled не сработает --
-        // тогда очистка ниже подчищает свойство, чтобы не осталось «залипшим»
-        // до следующего настоящего клика).
+        // Duplo clique na figura: mostrar o editor e destacar o seu botão na
+        // barra de ferramentas (o grupo exclusivo removerá a seleção do tipo anterior).
+        // A propriedade é um sinalizador descartável para o toggled abaixo: o destaque de uma figura
+        // existente não deve ativar o modo de inserção de uma NOVA (a conexão do rato no
+        // addPoint) -- caso contrário, um duplo clique na figura começava logo a criar
+        // uma segunda por cima dela. O setChecked() emite toggled() de forma síncrona, portanto
+        // no setProperty(false) posterior o sinalizador já foi lido (se chegou a mudar: se o botão
+        // já estivesse ativo, o toggled não é acionado -- então a limpeza abaixo limpa a propriedade
+        // para que não fique presa até ao próximo clique real).
         connect(shPlugin, &Shapes::Plugin::showEditor, this, [this, action](QWidget* editor) {
             setDockWidget(editor);
             action->setProperty("ggSkipInsert", true);
@@ -950,6 +951,12 @@ void MainWindow::saveSelectedGCodeFiles() {
 
                 if(name.isEmpty())
                     return;
+
+                // Garante que o arquivo tenha a extensão de G-Code configurada
+                QString ext = u"."_s + App::gcSettings().fileExtension();
+                if(!name.endsWith(ext, Qt::CaseInsensitive))
+                    name += ext;
+
                 file->save(name);
                 file->itemGroup()->setVisible(false);
             }
@@ -965,13 +972,19 @@ void MainWindow::saveSelectedGCodeFiles() {
 
             if(name.isEmpty())
                 return;
+
+            // Garante que o arquivo tenha a extensão de G-Code configurada
+            QString ext = u"."_s + App::gcSettings().fileExtension();
+            if(!name.endsWith(ext, Qt::CaseInsensitive))
+                name += ext;
+
             std::vector<QString> sl;
 
             sl.emplace_back(GCode::File::comment(tr("\tContains files:")));
             for(auto file: files)
                 sl.push_back(GCode::File::comment(u"\t"_s + file->shortName()));
-            // Шапка -- только у первого файла, концовка -- только у последнего:
-            // один станочный файл, а не склейка нескольких.
+            // Cabeçalho apenas no primeiro arquivo, rodapé apenas no último:
+            // gera um único arquivo de usinagem em vez da junção de vários.
             for(auto file: files) {
                 file->itemGroup()->setVisible(false);
                 unsigned sections = GCode::File::Body;
@@ -1028,8 +1041,8 @@ void MainWindow::editGcFile(int32_t id) {
     if(!file) return;
     auto* plugin = App::gCodePlugin(file->type());
     if(!plugin) return;
-    // Отметить действие на панели: его toggled и покажет форму в доке. Если оно
-    // уже отмечено, сигнал не придёт -- форму покажет сам plugin->editFile.
+    // Marcar a ação no painel: o seu toggled exibirá o formulário no dock. Se já estiver
+    // marcada, o sinal não chegará -- o próprio plugin->editFile exibirá o formulário.
     if(auto it = toolpathActions.find(file->type()); it != toolpathActions.end())
         it->second->setChecked(true);
     plugin->editFile(file);
@@ -1092,9 +1105,9 @@ void MainWindow::showEvent(QShowEvent* event) {
 }
 
 void MainWindow::changeEvent(QEvent* event) {
-    // В случае получения события изменения языка приложения
+    // No caso de receber um evento de alteração de idioma do aplicativo
     if(event->type() == QEvent::LanguageChange)
-        ui.retranslateUi(this); // переведём окно заново
+        ui.retranslateUi(this); // traduz a janela novamente
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
@@ -1147,7 +1160,7 @@ void MainWindow::Ui::setupUi(QMainWindow* MainWindow) {
         | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable);
     loggingDockWidget->setAllowedAreas(Qt::AllDockWidgetAreas);
 
-    loggingTextBrowser = new QTextBrowser{loggingDockWidget}; // NOTE loggingTextBrowser
+    loggingTextBrowser = new QTextBrowser{loggingDockWidget}; // NOTA loggingTextBrowser
     loggingTextBrowser->setObjectName(u"loggingTextBrowser"_s);
     loggingTextBrowser->setReadOnly(true);
     loggingTextBrowser->setWordWrapMode(QTextOption::NoWrap);

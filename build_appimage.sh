@@ -1,37 +1,63 @@
 #!/usr/bin/env bash
 set -e
 
-# --- Configuração de Caminhos ---
-BUILD_DIR="${HOME}/GERBER_X3/bin/Qt6._GNU_Release_x64/bin"
-APPDIR_OUTPUT="${HOME}/AppDir_Build"
-APPDIR="${APPDIR_OUTPUT}/AppDir"
-FINAL_APPIMAGE="${APPDIR_OUTPUT}/PizuttiCAM-x86_64.AppImage"
+echo "==> Compilando PizuttiCAM em Ubuntu 22.04 (GLIBC 2.35 + Boost 1.85)..."
 
-echo "==> [1/5] Preparando estrutura do AppDir..."
-rm -rf "${APPDIR_OUTPUT}"
-mkdir -p "${APPDIR}/usr/bin"
-mkdir -p "${APPDIR}/usr/plugins"
-mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
+docker run --rm -v "${HOME}/GERBER_X3:/workspace" -w /workspace ubuntu:22.04 bash -c "
+    set -e
+    apt-get update && apt-get install -y \
+        build-essential ninja-build qt6-base-dev qt6-tools-dev \
+        libgl1-mesa-dev libglu1-mesa-dev curl git file gpg wget
 
-echo "==> [2/5] Copiando executável, plugins do Qt6 e recursos do PizuttiCAM..."
-# Executável principal
-cp "${BUILD_DIR}/GGEasy" "${APPDIR}/usr/bin/"
-chmod +x "${APPDIR}/usr/bin/GGEasy"
+    # 1. Instala CMake 4+ atualizado da Kitware
+    test -f /usr/share/doc/kitware-archive-keyring/copyright || wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor -o /etc/apt/trusted.gpg.d/kitware.gpg
+    echo 'deb https://apt.kitware.com/ubuntu/ jammy main' | tee /etc/apt/sources.list.d/kitware.list
+    apt-get update && apt-get install -y cmake
 
-# Plugins e scripts próprios
-cp -r "${BUILD_DIR}/plugins" "${APPDIR}/usr/bin/" 2>/dev/null || true
-cp -r "${BUILD_DIR}/scripts" "${APPDIR}/usr/bin/" 2>/dev/null || true
-cp -r "${BUILD_DIR}/tools" "${APPDIR}/usr/bin/" 2>/dev/null || true
-cp -r "${BUILD_DIR}/settings" "${APPDIR}/usr/bin/" 2>/dev/null || true
+    # 2. Garante a estrutura do Boost 1.85 pré-compilado oficial
+    if [ ! -f '/workspace/third_party/boost_1_85_0/CMakeLists.txt' ]; then
+        echo '==> Baixando e configurando suporte completo ao Boost 1.85.0...'
+        rm -rf /workspace/third_party/boost_1_85_0
+        mkdir -p /workspace/third_party
+        wget -q https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.gz -O /tmp/boost.tar.gz
+        tar -xf /tmp/boost.tar.gz -C /workspace/third_party/
+        rm -f /tmp/boost.tar.gz
+    fi
 
-# Plugins de exibição do Qt 6 do Arch Linux (X11 / Wayland)
-cp -r /usr/lib/qt6/plugins/platforms "${APPDIR}/usr/plugins/"
+    # 3. Limpa e compila do zero com Boost em modo Module/Headers
+    rm -rf bin/docker_build
+    cmake -S . -B bin/docker_build -GNinja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBOOST_ROOT=/workspace/third_party/boost_1_85_0 \
+        -DBoost_NO_WARN_NEW_VERSIONS=ON \
+        -DCMAKE_DISABLE_FIND_PACKAGE_Boost=OFF
 
-# Ícone e Desktop File
-cp "${HOME}/GERBER_X3/ggeasy/res/256.png" "${APPDIR}/pizutticam.png"
-cp "${HOME}/GERBER_X3/ggeasy/res/256.png" "${APPDIR}/.DirIcon"
+    ninja -C bin/docker_build
 
-cat <<EOF > "${APPDIR}/pizutticam.desktop"
+    # 4. Prepara a estrutura do AppDir
+    mkdir -p AppDir/usr/bin AppDir/usr/lib AppDir/usr/plugins AppDir/usr/share/icons/hicolor/256x256/apps
+
+    cp bin/docker_build/bin/GGEasy AppDir/usr/bin/
+    chmod +x AppDir/usr/bin/GGEasy
+
+    # Copia bibliotecas do projeto (.so)
+    find bin/docker_build -name '*.so*' -exec cp {} AppDir/usr/lib/ \; 2>/dev/null || true
+
+    # Copia plugins e recursos
+    cp -r bin/docker_build/bin/plugins AppDir/usr/bin/ 2>/dev/null || true
+    cp -r bin/docker_build/bin/scripts AppDir/usr/bin/ 2>/dev/null || true
+    cp -r bin/docker_build/bin/tools AppDir/usr/bin/ 2>/dev/null || true
+    cp -r bin/docker_build/bin/settings AppDir/usr/bin/ 2>/dev/null || true
+
+    # Copia bibliotecas e plugins do Qt6
+    cp -r /usr/lib/x86_64-linux-gnu/qt6/plugins/* AppDir/usr/plugins/ 2>/dev/null || true
+    cp -d /usr/lib/x86_64-linux-gnu/libQt6*.so* AppDir/usr/lib/ 2>/dev/null || true
+
+    # Desktop e Ícones
+    cp ggeasy/res/256.png AppDir/pizutticam.png
+    cp ggeasy/res/256.png AppDir/.DirIcon
+
+    cat <<EOF > AppDir/pizutticam.desktop
 [Desktop Entry]
 Type=Application
 Name=PizuttiCAM
@@ -42,40 +68,29 @@ Comment=PizuttiCAM PCB Viewer e CAM
 Terminal=false
 EOF
 
-echo "==> [3/5] Criando o lançador AppRun com aceleração OpenGL..."
-cat << 'EOF' > "${APPDIR}/AppRun"
+    # AppRun
+    cat << 'EOF_RUN' > AppDir/AppRun
 #!/bin/sh
-HERE="$(dirname "$(readlink -f "${0}")")"
-
-export PATH="${HERE}/usr/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/bin:${LD_LIBRARY_PATH}"
-export QT_PLUGIN_PATH="${HERE}/usr/plugins:${HERE}/usr/bin/plugins"
-
-# Forçar aceleração gráfica por hardware na GPU (AMD / Mesa)
+HERE=\"\$(dirname \"\$(readlink -f \"\${0}\")\")\"
+export PATH=\"\${HERE}/usr/bin:\${PATH}\"
+export LD_LIBRARY_PATH=\"\${HERE}/usr/lib:\${HERE}/usr/bin:\${LD_LIBRARY_PATH}\"
+export QT_PLUGIN_PATH=\"\${HERE}/usr/plugins\"
 export GGEASY_OPENGL=desktop
+cd \"\${HERE}/usr/bin\"
+exec \"./GGEasy\" \"\$@\"
+EOF_RUN
+    chmod +x AppDir/AppRun
 
-# Mudar para a pasta dos binários para carregar recursos relativos
-cd "${HERE}/usr/bin"
-
-exec "./GGEasy" "$@"
-EOF
-
-chmod +x "${APPDIR}/AppRun"
-
-echo "==> [4/5] Baixando e executando appimagetool..."
-cd "${APPDIR_OUTPUT}"
-if [ ! -f "appimagetool-x86_64.AppImage" ]; then
+    # Baixa appimagetool e gera o pacote final
     curl -sLO https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
     chmod +x appimagetool-x86_64.AppImage
-fi
+    ./appimagetool-x86_64.AppImage AppDir PizuttiCAM-x86_64.AppImage
 
-./appimagetool-x86_64.AppImage "${APPDIR}" "${FINAL_APPIMAGE}"
-
-echo "==> [5/5] Garantindo diretório de dados persistentes do usuário..."
-mkdir -p "${HOME}/.config/GGEasy/tools"
-mkdir -p "${HOME}/.config/PizuttiCAM/tools"
+    # Limpeza da pasta temporária do AppDir
+    rm -rf AppDir appimagetool-x86_64.AppImage
+"
 
 echo "=========================================="
-echo " Concluído! AppImage gerado com sucesso em:"
-echo " ${FINAL_APPIMAGE}"
+echo " Concluído! O AppImage UNIVERSAL foi gerado em:"
+echo " ${HOME}/GERBER_X3/PizuttiCAM-x86_64.AppImage"
 echo "=========================================="
